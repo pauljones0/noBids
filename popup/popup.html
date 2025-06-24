@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoBids Shield</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>NoBids Shield</h1>
+        </header>
+        
+        <div class="card">
+            <p>Listings blocked on this page:</p>
+            <div id="blockedCount">0</div>
+        </div>
+
+        <div class="card">
+            <label for="toggleSwitch" class="toggle-label">Enable/Disable Extension</label>
+            <label class="switch">
+                <input type="checkbox" id="toggleSwitch">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <button id="rateMeBtn">Rate this Add-on</button>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

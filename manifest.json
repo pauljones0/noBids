@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "HideNoBids",
+  "version": "1.0",
+  "description": "Hides eBay listings with zero bids.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.ebay.at/sch/*",
+    "*://*.ebay.be/sch/*",
+    "*://*.ebay.ca/sch/*",
+    "*://*.ebay.ch/sch/*",
+    "*://*.ebay.cn/sch/*",
+    "*://*.ebay.co.jp/sch/*",
+    "*://*.ebay.co.uk/sch/*",
+    "*://*.ebay.com/sch/*",
+    "*://*.ebay.com.au/sch/*",
+    "*://*.ebay.com.hk/sch/*",
+    "*://*.ebay.com.mx/sch/*",
+    "*://*.ebay.com.my/sch/*",
+    "*://*.ebay.com.sg/sch/*",
+    "*://*.ebay.com.tw/sch/*",
+    "*://*.ebay.de/sch/*",
+    "*://*.ebay.es/sch/*",
+    "*://*.ebay.fr/sch/*",
+    "*://*.ebay.ie/sch/*",
+    "*://*.ebay.in/sch/*",
+    "*://*.ebay.it/sch/*",
+    "*://*.ebay.nl/sch/*",
+    "*://*.ebay.ph/sch/*",
+    "*://*.ebay.pl/sch/*",
+    "*://*.ebay.se/sch/*",
+    "*://*.ebay.vn/sch/*",
+    "*://*.ebaythailand.co.th/sch/*"
+  ],
+  "background": {
+    "scripts": [
+      "scripts/background.js"
+    ]
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon-off.svg"
+    }
+  },
+  "icons": {
+    "48": "icons/icon-off.svg",
+    "96": "icons/icon-96.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hidenobids@example.com",
+      "strict_min_version": "42.0"
+    }
+  }
+}
