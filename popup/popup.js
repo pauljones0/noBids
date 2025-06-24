@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen for clicks on the "Rate Me" button
     rateMeBtn.addEventListener('click', () => {
-        const extensionUrl = 'https://addons.mozilla.org/en-US/firefox/addon/hidenobids/';
+        const extensionUrl = 'https://addons.mozilla.org/en-CA/firefox/addon/hidenobids/';
         browser.tabs.create({ url: extensionUrl });
     });
 
