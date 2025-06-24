@@ -93,6 +93,7 @@ try {
             });
           }
         }
+        updateBadge(tabId);
       } catch (e) {
         console.error('Error on tab update:', e);
       }
@@ -109,6 +110,35 @@ try {
       }
     } catch (e) {
       console.error('Error cleaning up tab count on removal:', e);
+    }
+  });
+
+  // 6. Update badge text
+  async function updateBadge(tabId) {
+    try {
+      await browser.action.setBadgeBackgroundColor({ color: '#808080' });
+      await browser.action.setBadgeTextColor({ color: '#FFFFFF' });
+      const { tabBlockedCounts = {} } = await browser.storage.local.get('tabBlockedCounts');
+      const count = tabBlockedCounts[tabId] || 0;
+      await browser.action.setBadgeText({ text: count > 0 ? `${count}` : '' });
+    } catch (e) {
+      console.error('Error updating badge:', e);
+    }
+  }
+
+  // 7. Listen for tab activation
+  browser.tabs.onActivated.addListener(activeInfo => {
+    updateBadge(activeInfo.tabId);
+  });
+
+  // 8. Listen for storage changes
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.tabBlockedCounts) {
+      browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+        if (tabs.length > 0) {
+          updateBadge(tabs[0].id);
+        }
+      });
     }
   });
 
