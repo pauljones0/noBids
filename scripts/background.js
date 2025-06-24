@@ -27,6 +27,7 @@ function isUrlAllowed(url) {
   });
 }
 
+// This script runs in the background and manages the extension's state, tab updates, and messaging.
 try {
   // 1. Default State on Installation
   browser.runtime.onInstalled.addListener(() => {
