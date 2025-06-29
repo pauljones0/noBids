@@ -1,148 +1,130 @@
 // scripts/background.js
+console.log('Background script initialized.');
 
-const ALLOWED_HOSTS = [
-  "*://*.ebay.at/sch/*", "*://*.ebay.be/sch/*", "*://*.ebay.ca/sch/*",
-  "*://*.ebay.ch/sch/*", "*://*.ebay.cn/sch/*", "*://*.ebay.co.jp/sch/*",
-  "*://*.ebay.co.uk/sch/*", "*://*.ebay.com/sch/*", "*://*.ebay.com.au/sch/*",
-  "*://*.ebay.com.hk/sch/*", "*://*.ebay.com.mx/sch/*", "*://*.ebay.com.my/sch/*",
-  "*://*.ebay.com.sg/sch/*", "*://*.ebay.com.tw/sch/*", "*://*.ebay.de/sch/*",
-  "*://*.ebay.es/sch/*", "*://*.ebay.fr/sch/*", "*://*.ebay.ie/sch/*",
-  "*://*.ebay.in/sch/*", "*://*.ebay.it/sch/*", "*://*.ebay.nl/sch/*",
-  "*://*.ebay.ph/sch/*", "*://*.ebay.pl/sch/*", "*://*.ebay.se/sch/*",
-  "*://*.ebay.vn/sch/*", "*://*.ebaythailand.co.th/sch/*"
-];
+// --- Icon and Badge Management ---
 
 /**
- * Checks if a given URL matches any of the patterns in ALLOWED_HOSTS.
- * @param {string} url The URL to check.
- * @returns {boolean} True if the URL is allowed, false otherwise.
+ * Updates the browser action icon based on the extension's state.
+ * @param {boolean} isEnabled - Whether the extension is enabled.
  */
-function isUrlAllowed(url) {
-  if (!url) return false;
-  // This is a simplified conversion of match patterns to a regular expression.
-  // It's sufficient for the patterns used in this extension, which follow a simple structure.
-  return ALLOWED_HOSTS.some(pattern => {
-    const regex = new RegExp(pattern.replace(/[.]/g, '\\.').replace(/\*/g, '.*'));
-    return regex.test(url);
-  });
+function updateIcon(isEnabled) {
+  const path = isEnabled ? 'icons/icon-on.svg' : 'icons/icon-off.svg';
+  browser.action.setIcon({ path });
 }
 
-// This script runs in the background and manages the extension's state, tab updates, and messaging.
-try {
-  // 1. Default State on Installation
-  browser.runtime.onInstalled.addListener(() => {
-    try {
-      browser.storage.local.set({ extensionEnabled: false, tabBlockedCounts: {} });
-      browser.action.setIcon({ path: 'icons/icon-off.svg' });
-      console.log('Extension installed and state initialized to disabled.');
-    } catch (e) {
-      console.error('Error during onInstalled listener:', e);
-    }
-  });
+/**
+ * Updates the badge text for a specific tab.
+ * @param {number} tabId - The ID of the tab to update.
+ * @param {number} count - The number to display in the badge.
+ */
+function updateBadge(tabId, count) {
+  if (tabId) {
+    browser.action.setBadgeText({
+      text: count > 0 ? count.toString() : '',
+      tabId: tabId
+    });
+    browser.action.setBadgeBackgroundColor({
+      color: '#0052cc',
+      tabId: tabId
+    });
+  }
+}
 
-  // 3. State Toggling on Message
-  browser.runtime.onMessage.addListener(async (message, sender) => {
-    if (message.action === 'toggleExtension') {
-      const { enabled } = message;
-      try {
-        await browser.storage.local.set({ extensionEnabled: enabled });
-        if (!enabled) {
-          await browser.storage.local.set({ tabBlockedCounts: {} });
-        }
-        const iconPath = enabled ? 'icons/icon-on.svg' : 'icons/icon-off.svg';
-        await browser.action.setIcon({ path: iconPath });
+// 1. State Management: Initialize default state and icon on startup
+(async () => {
+  const data = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
+  if (data.extensionEnabled === undefined) {
+    await browser.storage.local.set({ extensionEnabled: true });
+    updateIcon(true); // Set initial icon state
+  } else {
+    updateIcon(data.extensionEnabled); // Set icon based on stored state
+  }
+  if (data.maxBids === undefined) {
+    await browser.storage.local.set({ maxBids: 11 }); // 11 represents "All"
+  }
+})();
 
-        const tabs = await browser.tabs.query({ url: ALLOWED_HOSTS });
-        tabs.forEach(tab => {
-          // For enabling, we inject the script. The script itself will hide listings on load.
-          // For disabling, we send a message to the existing content script to un-hide listings.
-          if (enabled) {
-            browser.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['scripts/content.js']
-            });
-          } else {
-            browser.tabs.sendMessage(tab.id, { action: 'setState', enabled: false });
-          }
+// 2. Message Handling: Listen for messages from popup and content scripts
+browser.runtime.onMessage.addListener(async (message, sender) => {
+  console.log('Message received:', message); // Log every message
+
+  if (message.action === 'toggleExtension') {
+    await browser.storage.local.set({ extensionEnabled: message.enabled });
+    updateIcon(message.enabled); // Update icon on toggle
+    // Inform the content script
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (activeTab && activeTab.id) {
+        const state = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
+        console.log('Sending updateFilter to tab:', activeTab.id);
+        browser.tabs.sendMessage(activeTab.id, {
+            action: 'updateFilter',
+            ...state
         });
-
-      } catch (e) {
-        console.error('Error toggling extension state:', e);
-      }
-    } else if (message.action === 'updateCounter') {
-      try {
-        const { tabBlockedCounts = {} } = await browser.storage.local.get('tabBlockedCounts');
-        tabBlockedCounts[sender.tab.id] = message.count;
-        await browser.storage.local.set({ tabBlockedCounts });
-      } catch (e) {
-        console.error('Error updating counter:', e);
-      }
     }
-  });
-
-  // 4. Tab Updates
-  browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.url) {
-      try {
-        const data = await browser.storage.local.get('extensionEnabled');
-        if (data.extensionEnabled) {
-          // Check if the tab's URL matches host permissions
-          if (isUrlAllowed(tab.url)) {
-            await browser.scripting.executeScript({
-              target: { tabId: tabId },
-              files: ['scripts/content.js']
-            });
-          }
-        }
-        updateBadge(tabId);
-      } catch (e) {
-        console.error('Error on tab update:', e);
+  } else if (message.action === 'setMaxBids') {
+      await browser.storage.local.set({ maxBids: message.maxBids });
+      // Inform the content script
+      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (activeTab && activeTab.id) {
+          const state = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
+          console.log('Sending updateFilter to tab:', activeTab.id);
+          browser.tabs.sendMessage(activeTab.id, {
+              action: 'updateFilter',
+              ...state
+          });
       }
-    }
-  });
+  } else if (message.action === 'updateBlockedCount') {
+      if (sender.tab && sender.tab.id) {
+          updateBadge(sender.tab.id, message.count);
+          // Persist the count to storage
+          const data = await browser.storage.local.get('tabBlockedCounts');
+          const tabBlockedCounts = data.tabBlockedCounts || {};
+          tabBlockedCounts[sender.tab.id] = message.count;
+          await browser.storage.local.set({ tabBlockedCounts });
+      }
+  }
+});
 
-  // 5. Tab Closure
-  browser.tabs.onRemoved.addListener(async (tabId) => {
+
+// 3. Tab Event Handling: Inject content script and send state on page load
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // The "host_permissions" in manifest.json restrict this to eBay search pages.
+  // No need for a manual URL check here.
+  if (changeInfo.status === 'complete' && tab.url) {
     try {
-      const { tabBlockedCounts = {} } = await browser.storage.local.get('tabBlockedCounts');
-      if (tabBlockedCounts.hasOwnProperty(tabId)) {
-        delete tabBlockedCounts[tabId];
-        await browser.storage.local.set({ tabBlockedCounts });
+      await browser.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['scripts/content.js']
+      });
+      
+      const state = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
+      console.log('Sending updateFilter to tab:', tabId);
+      browser.tabs.sendMessage(tabId, {
+        action: 'updateFilter',
+        ...state
+      });
+    } catch (e) {
+      // Silently fail if the script can't be injected (e.g., on pages like chrome://extensions).
+      // The host_permissions should prevent this on most user-facing pages.
+      if (!e.message.includes("No host permissions for the given tab")) {
+          console.error(`Failed to inject or message tab ${tabId}:`, e);
       }
-    } catch (e) {
-      console.error('Error cleaning up tab count on removal:', e);
-    }
-  });
-
-  // 6. Update badge text
-  async function updateBadge(tabId) {
-    try {
-      await browser.action.setBadgeBackgroundColor({ color: '#808080' });
-      await browser.action.setBadgeTextColor({ color: '#FFFFFF' });
-      const { tabBlockedCounts = {} } = await browser.storage.local.get('tabBlockedCounts');
-      const count = tabBlockedCounts[tabId] || 0;
-      await browser.action.setBadgeText({ text: count > 0 ? `${count}` : '' });
-    } catch (e) {
-      console.error('Error updating badge:', e);
     }
   }
+});
 
-  // 7. Listen for tab activation
-  browser.tabs.onActivated.addListener(activeInfo => {
-    updateBadge(activeInfo.tabId);
-  });
-
-  // 8. Listen for storage changes
-  browser.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.tabBlockedCounts) {
-      browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
-        if (tabs.length > 0) {
-          updateBadge(tabs[0].id);
-        }
-      });
+// 4. Tab Activation: Send state to newly activated tabs
+browser.tabs.onActivated.addListener(async (activeInfo) => {
+    try {
+        const state = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
+        console.log('Sending updateFilter to tab:', activeInfo.tabId);
+        browser.tabs.sendMessage(activeInfo.tabId, {
+            action: 'updateFilter',
+            ...state
+        });
+    } catch (e) {
+        // This can happen if the content script is not yet injected in the activated tab.
+        // onUpdated will handle it when the tab is loaded or updated.
+        // console.warn(`Could not message tab ${activeInfo.tabId} on activation:`, e.message);
     }
-  });
-
-} catch (e) {
-  console.error('Global error in background script:', e);
-}
+});

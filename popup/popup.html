@@ -26,6 +26,13 @@
             </label>
         </div>
 
+        <div id="sliderContainer" class="card">
+            <label for="maxBidsSlider">Max Bids to Show</label>
+            <input type="range" id="maxBidsSlider" min="1" max="11" value="1">
+            <div id="sliderValue">5</div>
+            <p id="filter-description" class="info-text">Hides items with 0 bids. Use the slider to set the max number of bids to show.</p>
+        </div>
+
         <button id="rateMeBtn">Rate this Add-on</button>
     </div>
     <script src="popup.js"></script>
