@@ -128,3 +128,16 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
         // console.warn(`Could not message tab ${activeInfo.tabId} on activation:`, e.message);
     }
 });
+
+// --- Refactor: Add listener for tab removal to clean up storage ---
+// FIX: This prevents the 'tabBlockedCounts' object in storage from growing
+// indefinitely with data from closed tabs.
+browser.tabs.onRemoved.addListener(async (tabId) => {
+    console.log(`Tab ${tabId} closed, cleaning up storage.`);
+    const data = await browser.storage.local.get('tabBlockedCounts');
+    if (data.tabBlockedCounts && data.tabBlockedCounts[tabId] !== undefined) {
+        delete data.tabBlockedCounts[tabId];
+        await browser.storage.local.set({ tabBlockedCounts: data.tabBlockedCounts });
+        console.log(`Removed tab ${tabId} from storage.`);
+    }
+});

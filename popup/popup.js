@@ -1,6 +1,30 @@
 console.log('Popup script initialized.');
 
-document.addEventListener('DOMContentLoaded', () => {
+// --- Refactor: Named functions for event listeners for proper removal ---
+// These functions are defined in a scope accessible for both adding and removing listeners.
+
+/**
+ * Handles changes in browser storage, specifically for 'tabBlockedCounts'.
+ * @param {object} changes - The object describing the changes.
+ * @param {string} namespace - The namespace of the storage that changed ('local', 'sync', or 'managed').
+ */
+const handleStorageChange = (changes, namespace) => {
+    if (namespace === 'local' && changes.tabBlockedCounts) {
+        // FIX: Updates the blocked count display when storage changes.
+        updateBlockedCount();
+    }
+};
+
+/**
+ * Handles the activation of a new tab by updating the blocked count display.
+ */
+const handleTabActivation = () => {
+    // FIX: Updates the blocked count for the newly active tab.
+    updateBlockedCount();
+};
+
+
+document.addEventListener('DOMContentLoaded', async () => {
     const toggleSwitch = document.getElementById('toggleSwitch');
     const rateMeBtn = document.getElementById('rateMeBtn');
     const blockedCountEl = document.getElementById('blockedCount');
@@ -31,8 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Load initial state from storage
-    browser.storage.local.get(['extensionEnabled', 'maxBids']).then((data) => {
+    // --- Refactor: Use async/await for improved readability ---
+    // FIX: Replaced the .then() chain with a more modern and readable async/await block.
+    try {
+        const data = await browser.storage.local.get(['extensionEnabled', 'maxBids']);
         console.log('Loaded settings:', data);
         const isEnabled = !!data.extensionEnabled;
         const savedMaxBids = data.maxBids !== undefined ? data.maxBids : 11; // Default to 11
@@ -43,7 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSliderValueText(savedMaxBids);
         updateFilterDescription(savedMaxBids);
         updateSliderVisibility(isEnabled);
-    });
+    } catch (e) {
+        console.error("Error loading initial state:", e);
+    }
 
 
     // Listen for changes on the toggle switch
@@ -95,15 +123,17 @@ document.addEventListener('DOMContentLoaded', () => {
         browser.tabs.create({ url: extensionUrl });
     });
 
-    // Listen for changes in storage to update the count live
-    browser.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'local') {
-            if (changes.tabBlockedCounts) {
-                updateBlockedCount();
-            }
-        }
-    });
+    // --- Refactor: Add event listeners using named functions ---
+    // FIX: This allows us to remove them later, preventing memory leaks.
+    browser.storage.onChanged.addListener(handleStorageChange);
+    browser.tabs.onActivated.addListener(handleTabActivation);
 
-    // Also listen for tab activation changes to update the count
-    browser.tabs.onActivated.addListener(updateBlockedCount);
+    // --- Refactor: Add unload event listener for cleanup ---
+    // FIX: This is the core of the memory leak fix. When the popup is closed,
+    // these listeners are removed, freeing up resources.
+    window.addEventListener('unload', () => {
+        console.log('Popup unloading, removing listeners.');
+        browser.storage.onChanged.removeListener(handleStorageChange);
+        browser.tabs.onActivated.removeListener(handleTabActivation);
+    });
 });
